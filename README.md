@@ -102,6 +102,10 @@ data class ItemModel(
 )
 ```
 
+@Entity: Essa linha diz para o Room Database (seu caderno inteligente) que ItemModel é algo que ele deve guardar como uma linha na tabela.
+@PrimaryKey(autoGenerate = true): Imagina que cada item da sua lista precisa de um número de identificação único. Essa linha diz que o id é esse número e que o banco de dados vai gerá-lo automaticamente para você (começando do 0 e aumentando).
+val name: String: Isso define que cada item terá um nome (que é um texto).
+
 ### `ItemDao.kt`
 
 ```kotlin
@@ -117,6 +121,12 @@ interface ItemDao {
     fun delete(item: ItemModel)
 }
 ```
+@Dao: Diz que esta é a pessoa que sabe como interagir com o banco de dados.
+@Query("SELECT * FROM ItemModel"): Essa é uma "pergunta" que você faz ao banco de dados: "Me traga TUDO (*) que está na tabela ItemModel".
+fun getAll(): LiveData<List<ItemModel>>: Essa função vai te dar uma lista de todos os seus itens (List<ItemModel>), e essa lista é "observável" (LiveData), ou seja, se algo mudar nela, a tela será avisada.
+@Insert e fun insert(item: ItemModel): É a instrução para adicionar um novo item (item: ItemModel) no banco de dados.
+@Delete e fun delete(item: ItemModel): É a instrução para remover um item (item: ItemModel) do banco de dados.
+
 
 ### `ItemDatabase.kt`
 
@@ -126,10 +136,12 @@ abstract class ItemDatabase : RoomDatabase() {
     abstract fun itemDao(): ItemDao
 }
 ```
+@Database(entities = [ItemModel::class], version = 1): Essa linha diz que este é o seu banco de dados. Ela especifica quais tipos de "coisas" (entities = [ItemModel::class]) serão guardadas nele e qual a "versão" do seu banco (a version = 1 indica que é a primeira versão dele).
+abstract fun itemDao(): ItemDao: Isso diz que o seu banco de dados tem uma "interface" para você interagir com ele, que é o seu ItemDao.
 
 ---
 
-## 🧠 ViewModel
+## 🧠 ViewModel (Cérebro da operação)
 
 ### `ItemsViewModel.kt`
 
@@ -162,7 +174,13 @@ class ItemsViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 ```
-
+class ItemsViewModel(...) : AndroidViewModel(...): Basicamente, está dizendo que este é o "gerente de palco" para os itens da lista e que ele tem acesso a coisas básicas do aplicativo (como o contexto para criar o banco de dados).
+init { ... }: Esse bloco é executado quando o ViewModel é criado. É onde ele "configura" o acesso ao seu banco de dados (Room.databaseBuilder(...)) para poder guardar e pegar as informações. O "items_database" é o nome do seu arquivo de banco de dados.
+fun addItem(item: String): Essa função é a que chama para adicionar um novo item à sua lista.
+viewModelScope.launch(Dispatchers.IO) { ... }: Aqui entram as Coroutines (launch). Essa parte diz: "Vou fazer essa tarefa de adicionar o item em segundo plano (Dispatchers.IO), sem travar o aplicativo principal".
+val newItem = ItemModel(name = item): Cria um novo item com o nome que foi digitado.
+itemDao.insert(newItem): Pede para o ItemDao (a pessoa que sabe interagir com o banco) guardar esse novo item.
+fun removeItem(item: ItemModel): Essa função é para remover um item da lista, também fazendo isso em segundo plano para não travar o app.
 ---
 
 ## 🔄 ItemsAdapter
@@ -199,7 +217,15 @@ class ItemsAdapter(private val onItemRemoved: (ItemModel) -> Unit)
     }
 }
 ```
-
+class ItemsAdapter(...) : RecyclerView.Adapter<ItemsAdapter.ItemViewHolder>(): Basicamente, este é o "garçom" que trabalha com o RecyclerView (o mural inteligente). Ele sabe como pegar os dados e mostrar na tela.
+O (private val onItemRemoved: (ItemModel) -> Unit) é uma forma de dizer que, quando um item for removido, ele vai "avisar" alguém (que no caso é o ViewModel para apagar do banco).
+private var items = listOf<ItemModel>(): É a lista de itens que o garçom está carregando na bandeja para mostrar.
+override fun onCreateViewHolder(...): É quando o garçom precisa criar um novo espaço na bandeja para colocar um item. Ele "infla" (transforma em algo visível) o desenho do item_layout.xml.
+override fun getItemCount(): Int = items.size: O garçom está te dizendo quantos itens ele tem na bandeja.
+override fun onBindViewHolder(...): É o momento em que o garçom pega um item específico da lista (items[position]) e o coloca no espaço da bandeja (holder), preenchendo as informações dele.
+inner class ItemViewHolder(...): Essa é a "caneta" do garçom. É com ela que ele escreve o nome do item e coloca o botão de apagar em cada espaço da bandeja.
+textView.text = item.name: Coloca o nome do item no local certo na tela.
+button.setOnClickListener { onItemRemoved(item) }: Quando clica no botão de apagar, ele chama a função onItemRemoved (que foi passada para o Adapter) e diz qual item deve ser removido.
 ---
 
 ## 🖼️ Interface XML
